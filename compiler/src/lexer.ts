@@ -9,6 +9,19 @@ let float_regex = new RegExp(`(?:${dec_regex})?\.\\d+`);
 const lexer = moo.compile({
     /* Reserved Words */
     Identifier: {match: /[_a-zA-Z][\w]*/, type: moo.keywords({
+        PrimitiveType: [
+            'str',
+            'bool',
+            'ptr',
+            'u8',
+            'u16',
+            'u32',
+            'u64',
+            'i8',
+            'i16',
+            'i32',
+            'i64',
+        ],
         ReservedWords: [
             'import',
             'from',
@@ -21,7 +34,6 @@ const lexer = moo.compile({
             'break',
             'return',
             'if',
-            'else',
             'elif',
             'match',
             'or',
@@ -30,8 +42,28 @@ const lexer = moo.compile({
             'not',
             'true',
             'false',
+            'in',
         ]
     })},
+
+    /* Literals */
+    Character: /'.+'/,
+    NoEscapeString: /"(?:\\["\\]|[^\n"\\])*"/,
+    String: /[a-z]?"(?:\\["\\a-z]|[^\n"\\])*"/,
+    DecLiteral: dec_regex,
+    HexLiteral: /0x[0-9a-fA-F]+/,
+    BinLiteral: /[10_]+b/,
+    FloatLiteral: float_regex,
+    SciNotationLiteral: new RegExp(`(?:${float_regex})[eE][-]?\\d+`),
+
+    /* Misc */
+    //SingleLineComment
+    SLC: /#.*/,
+    //MultiLineComment
+    MLC: /\`\`\`(?:.|\n)*\`\`\`/,
+    // Markdown: 
+    WS: /[ \t]+/,
+    NL: { match: /\r\n|\n/, lineBreaks: true},
 
     /* Symbols */
     '!': '!',
@@ -62,25 +94,6 @@ const lexer = moo.compile({
     '>': '>',
     '/': '/',
     '?': '?',
-
-    /* Literals */
-    Character: /'.+'/,
-    NoEscapeString: /"(?:\\["\\]|[^\n"\\])*"/,
-    String: /[a-z]?"(?:\\["\\a-z]|[^\n"\\])*"/,
-    DecLiteral: dec_regex,
-    HexLiteral: /0x[0-9a-fA-F]+/,
-    BinLiteral: /[10_]+b/,
-    FloatLiteral: float_regex,
-    SciNotationLiteral: new RegExp(`(?:${float_regex})[eE][-]?\\d+`),
-
-    /* Misc */
-    /*
-        TODO: Use markdown blockquote as multi-line comments
-    */
-    Comment: /\/\/.*/,
-    // Markdown: 
-    WS: /[ \t]+/,
-    NL: { match: /\r\n|\n/, lineBreaks: true},
 });
 
 // Wrapping lexer so it will ignore whitespaces

@@ -1,10 +1,11 @@
-const {task, src, dest, series} = require("gulp");
-const gulp_ts = require("gulp-typescript");
-const gulp_exec = require("gulp-exec");
+const {task, src, dest, series, parallel} = require("gulp");
+const ts = require("gulp-typescript");
+const exec = require("gulp-exec");
 const replace_ext = require("replace-ext");
-const path_util = require('path');
+const mocha = require("gulp-mocha");
+const { reporter } = require("gulp-typescript");
 
-var tsc = gulp_ts.createProject('tsconfig.json');
+var tsc = ts.createProject('tsconfig.json');
 
 /**
  * @name compile-ts
@@ -13,7 +14,7 @@ var tsc = gulp_ts.createProject('tsconfig.json');
 function compile_ts(){
     return src('src/**/*.ts')
         .pipe(tsc())
-        .pipe(dest('lib'));
+        .pipe(dest('build'));
 }
 
 /**
@@ -22,8 +23,8 @@ function compile_ts(){
  */
 function compile_ne(){
     return src('src/**/*.ne')
-        .pipe(gulp_exec(file => `nearleyc ${file.path} -o ${replace_ext(file.path)}`))
-        .pipe(gulp_exec.reporter({err: true, stderr: true, stdout:true}));
+        .pipe(exec(file => `nearleyc ${file.path} -o ${replace_ext(file.path, '.ts')}`))
+        .pipe(exec.reporter({err: true, stderr: true, stdout:true}));
 }
 
 /**
@@ -33,12 +34,20 @@ function compile_ne(){
 task('build', series(compile_ne, compile_ts));
 
 /**
- * @name build-test
- * @description Build tests
+ * @name test
+ * @description Launch test
  */
-task('build-test', series('build', function(){
-    // Build tests
-    return src('tests/*.ts')
-        .pipe(tsc())
-        .pipe(dest('tests'));
+task('test', series('build', function(){
+    return src('build/tests/*.js')
+        .pipe(mocha({reporter: 'spec', }));
 }));
+
+/**
+ * @name railroad
+ * @description Generate Railroad graph for grammar
+ */
+task('railroad', function(){
+    return src('src/**/*.ne')
+        .pipe(exec(file => `nearley-railroad ${file.path} -o ${replace_ext(file.path, '.html')}`))
+        .pipe(exec.reporter({err: true, stderr: true, stdout:true}));
+});

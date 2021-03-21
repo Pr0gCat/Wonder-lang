@@ -2,13 +2,9 @@
   "name": "alice",
   "version": "1.0.0",
   "description": "Compiler of Wonder-lang",
-  "main": "build/index.js",
+  "main": "build/alice.js",
   "scripts": {
-    "build:grammar": "nearleyc src/grammar.ne -o src/grammar.ts",
-    "build": "npm run build:grammar && tsc",
-    "dev": "npm run build:grammar && ts-node-dev --respawn --watch src/grammar.ts tests/test_compiler.ts",
-    "railroad": "nearley-railroad src/grammar.ne -o grammar.html",
-    "clean": "rm -r lib src/grammar.ts"
+    "dev": "ts-node-dev src/tests/test_compiler.ts"
   },
   "author": "ProgCat",
   "license": "MIT",
@@ -19,8 +15,9 @@
     "@types/object-path": "^0.11.0",
     "gulp": "^4.0.2",
     "gulp-exec": "^5.0.0",
+    "gulp-mocha": "^8.0.0",
     "gulp-typescript": "^6.0.0-alpha.1",
-    "ts-node-dev": "^1.1.6",
+    "mocha": "^8.3.2",
     "typescript": "^4.2.3"
   },
   "dependencies": {

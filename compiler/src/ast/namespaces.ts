@@ -24,7 +24,7 @@ export class File {
 		public rel_path: string,
 		public lines: number,
 		public policy: [],
-		public ast: ASTNode[]
+		public ast: ASTNode[],
 	) {
 
 	}

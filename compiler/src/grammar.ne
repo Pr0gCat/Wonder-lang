@@ -4,8 +4,13 @@
 import { default as lexer_moo} from "./lexer";
 const lexer = (lexer_moo as unknown) as NearleyLexer;
 
-import * as nodes from "./ast/nodes";
+import {ParserState} from "./parser";
 
+import {File} from "./ast";
+
+import {
+	// TODO: Add all AST nodes here
+} from "./ast/nodes";
 
 %}
 
@@ -13,27 +18,43 @@ import * as nodes from "./ast/nodes";
 #
 #   Starting point
 #
-Program -> %NL:* (ImportDecl %NL:+):* (Statement %NL:+):*
+Program -> LineEnd:* (ImportDecl LineEnd:+):* (Statement LineEnd:+):*
 {%
-	tokens => console.log(tokens);
+	([nl, imports, stmts]) => {
+		return new ParserState(
+			imports.map(function(d:object[]){ return d[0]; }).flat(Infinity),
+			stmts.map(function(d:object[]){ return d[0]; }),
+		);
+	}
 %}
 
 # Import
 ImportDecl -> ("from" (ImportPath | NameRef)):? "import" ImportItemGroup
 {%
-	([from_part, _import, items]) => {
-		console.log('from', from_part);
-		console.log('items', items);
+	([_from, _import, items]) => {
+		return {
+			src: _from, 
+			items: items
+		};
 	}
 %}
 
-ImportPath -> %StringWithoutEsc {% id %}
+ImportPath -> %StringWithoutEsc
 
-ImportItemGroup -> ImportItem {% id %}
-		| ImportItemGroup "," ImportItem
-		{% ([gp, _, item]) => [...gp, item] %}
+ImportItemGroup -> ImportItem ("," ImportItem):* 
+{%
+	items => items[1].length > 0 ? [items[0], ...items[1].map(function(d:object[]){ return d[1]; })] : [items[0]]
+%}
 
-ImportItem -> %Identifier ("as" %Identifier):? {% id %}
+ImportItem -> %Identifier ("as" %Identifier):?
+{% 
+	items => {
+		return {
+			name: items[0], 
+			rename_as: items[1] === null ? null : items[1][1]
+		};
+	}
+%}
 
 #
 #   Declarations
@@ -41,17 +62,17 @@ ImportItem -> %Identifier ("as" %Identifier):? {% id %}
 Declaration -> VarDecl
 		| FuncDecl
 		| EnumDecl
-		| StructDecl
+		# | StructDecl
 
-VarDecl -> "let" VarList "=" ExprList
+VarDecl -> "let" VarNameList "=" ExprList
 
-FuncDecl -> "func" %Identifier "(" ParamList:? ")" BlockExpr
+FuncDecl -> "func" %Identifier "(" VarNameList ")" (":" Type):? BlockExpr
 
 EnumDecl -> "enum" %Identifier "{" EnumItem ("," EnumItem):* "}"
 
 EnumItem -> %Identifier ("=" Literal):?
 
-StructDecl -> "struct"
+# StructDecl -> "struct"
 
 #
 #   Statements
@@ -63,140 +84,135 @@ Statement -> UnaryStmt
 		| BreakStmt
 		| ReturnStmt
 
-UnaryStmt -> NameRef "++" {% tokens => new nodes.IncStmt(tokens) %}
-		| NameRef "--" {% tokens => new nodes.DecStmt(tokens) %}
+UnaryStmt -> (NameRef | IndexingExpr) "++" 
+		| (NameRef | IndexingExpr) "--"
 
-AssignStmt -> NameRef "=" Expression
-		| NameRef "+=" Expression
-		| NameRef "-=" Expression
-		| NameRef "*=" Expression
-		| NameRef "/=" Expression
-		| NameRef "%=" Expression
-		| NameRef "<<=" Expression
-		| NameRef ">>=" Expression
-		| NameRef "|=" Expression
-		| NameRef "&=" Expression
-		| NameRef "^=" Expression
+AssignStmt -> VarNameList "=" ExprList
+		| VarNameList "+=" ExprList
+		| VarNameList "-=" ExprList
+		| VarNameList "*=" ExprList
+		| VarNameList "/=" ExprList
+		| VarNameList "%=" ExprList
+		| VarNameList "<<=" ExprList
+		| VarNameList ">>=" ExprList
+		| VarNameList "|=" ExprList
+		| VarNameList "&=" ExprList
+		| VarNameList "^=" ExprList
 
-IfStmt -> "if" Expression BlockExpr (ElifStmt | ElseStmt):?
+IfStmt -> "if" Expression BlockExpr ElifStmt:?
 
-ElifStmt -> "elif" Expression BlockExpr (ElifStmt | ElseStmt):?
+ElifStmt -> "elif" Expression BlockExpr ElifStmt:?
 
-ElseStmt -> "else" BlockExpr
+ContinueStmt -> "continue" 
 
-ContinueStmt -> "continue" {% [token] => new nodes.ContinueStmt(token) %}
+BreakStmt -> "break"
 
-BreakStmt -> "break" {% [token] => new nodes.BreakStmt(token) %}
-
-ReturnStmt -> "return" Expression:? {% [ret, expr] => new nodes.ReturnStmt(ret, expr) %}
+ReturnStmt -> "return" Expression:? 
 
 #
 #   Expressions
 #
 Expression -> "(" Expression ")" {% tokens => tokens[1] %}
-		| CompareExpr
 		| BinOpExpr
 		| BoolOpExpr
-		| NameRef
+		| CompareExpr
+		| TupleExpr
+		| ArrayExpr
 		| BlockExpr
+		| IndexingExpr
 		| FunctionCallExpr
+		| RangeExpr
+		| NameRef
 
-FunctionCallExpr -> NameRef "(" ExprList:? ")"
+TernaryExpr ->  Expression "?" Expression ":" Expression
 
-BlockExpr -> "{" (Statement %NL:+):* "}"
+FunctionCallExpr -> Expression "(" ExprList:? ")" ("." FunctionCallExpr):*
 
-CompareExpr -> Expression "==" Expression {% [lhs, _, rhs] => new nodes.Equal(lhs, rhs) %}
-		| Expression "!=" Expression {% [lhs, _, rhs] => new nodes.NotEqual(lhs, rhs) %}
-		| Expression "<" Expression {% [lhs, _, rhs] => new nodes.Less(lhs, rhs) %}
-		| Expression "<=" Expression {% [lhs, _, rhs] => new nodes.LessThan(lhs, rhs) %}
-		| Expression ">" Expression {% [lhs, _, rhs] => new nodes.Greater(lhs, rhs) %}
-		| Expression ">=" Expression {% [lhs, _, rhs] => new nodes.GreaterEqual(lhs, rhs) %}
+BlockExpr -> "{" (Statement LineEnd:+):* "}"
 
 BinOpExpr -> BinOr
 
 BinOr -> BinXor
-		| BinOr "|" BinXor {% [lhs, _, rhs] => new nodes.BinOr(lhs, rhs) %}
+		| BinOr "|" BinXor 
 
 BinXor -> BinAnd
-		| BinXor "^" BinAnd {% [lhs, _, rhs] => new nodes.BinXor(lhs, rhs) %}
+		| BinXor "^" BinAnd 
 
 BinAnd -> BinShift
-		| BinAnd "&" BinShift {% [lhs, _, rhs] => new nodes.BinAnd(lhs, rhs) %}
+		| BinAnd "&" BinShift 
 
 BinShift -> BinAddSub
-		| BinShift "<<" BinAddSub {% [lhs, _, rhs] => new nodes.Shl(lhs, rhs) %}
-		| BinShift ">>" BinAddSub {% [lhs, _, rhs] => new nodes.Shr(lhs, rhs) %}
+		| BinShift "<<" BinAddSub
+		| BinShift ">>" BinAddSub
 
 BinAddSub -> BinMulDiv
-		| BinAddSub "-" BinMulDiv {% [lhs, _, rhs] => new nodes.Sub(lhs, rhs) %}
-		| BinAddSub "+" BinMulDiv {% [lhs, _, rhs] => new nodes.Add(lhs, rhs) %}
+		| BinAddSub "-" BinMulDiv 
+		| BinAddSub "+" BinMulDiv
 
 BinMulDiv -> BinUnary
-		| BinMulDiv "*" BinUnary {% [lhs, _, rhs] => new nodes.Mul(lhs, rhs) %}
-		| BinMulDiv "/" BinUnary {% [lhs, _, rhs] => new nodes.Div(lhs, rhs) %}
-		| BinMulDiv "%" BinUnary {% [lhs, _, rhs] => new nodes.Mod(lhs, rhs) %}
+		| BinMulDiv "*" BinUnary 
+		| BinMulDiv "/" BinUnary 
+		| BinMulDiv "%" BinUnary 
 
-BinUnary -> Literal {% id %}
-		| "!" Literal {% [sym, expr] => new nodes.BinNot(sym, expr) %}
-		| "-" Literal {% [sym, expr] => new nodes.Neg(sym, expr) %}
+BinUnary -> Literal
+		| "!" Literal 
+		| "-" Literal 
 
 BoolOpExpr -> BoolOr
 
 BoolOr -> BoolXor
-		| BoolOr "or" BoolXor {% [lhs, _, rhs] => new nodes.BoolOr(lhs, rhs) %}
+		| BoolOr "or" BoolXor 
 
 BoolXor -> BoolAnd
-		| BoolXor "xor" BoolAnd {% [lhs, _, rhs] => new nodes.BoolXor(lhs, rhs) %}
+		| BoolXor "xor" BoolAnd 
 
 BoolAnd -> BoolNot
-		| BoolAnd "and" BoolNot {% [lhs, _, rhs] => new nodes.BoolAnd(lhs, rhs) %}
+		| BoolAnd "and" BoolNot 
 
 BoolNot -> "not":? CompareExpr
-{%
-		[not, expr] => {
-				console.log(not, expr);
-		}
-%}
 
-Literal -> %DecLiteral {% [tok] => new nodes.Literal(tok) %}
-		| %BinLiteral {% [tok] => new nodes.Literal(tok) %}
-		| %HexLiteral {% [tok] => new nodes.Literal(tok) %}
-		| %TrueLiteral {% [tok] => new nodes.Literal(tok) %}
-		| %FalseLiteral {% [tok] => new nodes.Literal(tok) %}
-		| %FloatLiteral {% [tok] => new nodes.Literal(tok) %}
-		| %SciNotationLiteral {% [tok] => new nodes.Literal(tok) %}
-		| %StringWithoutEsc {% [tok] => new nodes.Literal(tok) %}
-		| %Character {% [] => new nodes.Literal(tok) %}
+CompareExpr -> Expression "==" Expression 
+		| Expression "!=" Expression 
+		| Expression "not":? "in" Expression
+		| Expression (("<" | ">" | "<=" | ">=") Expression):+
 
-# Tuple
-TupleDecl -> "(" (NameRef ","):+ NameRef:? ")"
+Literal -> %DecLiteral
+		| %BinLiteral
+		| %HexLiteral
+		| %TrueLiteral
+		| %FalseLiteral
+		| %FloatLiteral
+		| %SciNotationLiteral
+		| %StringWithoutEsc
+		| %Character
 
-TupleDef -> "(" (TupleMember ","):+ TupleMember:? ")"
+RangeExpr -> Expression:? ":" Expression:? (":" Expression):?
 
-TupleMember -> (%Identifier "="):? Expression
+TupleExpr -> "(" (Expression ","):+ Expression:? ")"
 
-TupleType -> "(" (NameRef ","):+ NameRef:? ")"
+ArrayExpr -> "[" Expression:? ("," Expression):* "]"
 
-# Array
-ArrayDef -> "[" Expression:? ("," Expression):* "]"
-
-ArraySlicing -> NameRef "[" %DecLiteral "]"
+IndexingExpr -> Expression "[" Expression "]"
 
 #
 #   Misc.
 #
-VarList -> (NameRef, ","):* NameRef
+ExprList -> Expression ("," Expression):*
 
-ExprList -> Expression {% tokens => [tokens[0]] %}
-		| ExprList "," Expression
-		{% tokens => [...tokens[0], tokens[2]] %}
+VarNameList -> VarName ("," VarName):*
 
-ParamList -> ParameterDecl {% tokens => [tokens[0]] %}
-		| ParamList "," ParameterDecl
-		{% tokens => [...tokens[0], tokens[2]] %}
+VarName -> %Identifier (":" Type):?
 
-NameRef -> %Identifier {% tokens => [tokens[0]] %}
-		| NameRef "." %Identifier
-		{% ([refs, _, name]) => [...refs, name] %}
+Type -> NameRef
+	| NameRef "*"
+	| NameRef "[]"
+	| "(" (NameRef ","):+ NameRef:? ")"
 
-ParameterDecl -> NameRef %Identifier {% [_type, name] => {} %}
+NameRef -> Name ("." Name)
+
+Name -> "@":? %Identifier
+
+LineEnd -> %SLC | %MLC | %NL
+{%
+	([item]) => item
+%}

@@ -3,7 +3,6 @@
 // Bypasses TS6133. Allow declared but unused functions.
 // @ts-ignore
 function id(d: any[]): any { return d[0]; }
-declare var NL: any;
 declare var StringWithoutEsc: any;
 declare var Identifier: any;
 declare var DecLiteral: any;
@@ -13,22 +12,23 @@ declare var TrueLiteral: any;
 declare var FalseLiteral: any;
 declare var FloatLiteral: any;
 declare var SciNotationLiteral: any;
+declare var Character: any;
+declare var SLC: any;
+declare var MLC: any;
+declare var NL: any;
 
 // issue: https://github.com/kach/nearley/issues/527#issuecomment-734847077
 import { default as lexer_moo} from "./lexer";
 const lexer = (lexer_moo as unknown) as NearleyLexer;
 
-import * as nodes from "./ast/nodes";
+import {ParserState} from "./parser";
 
-let io = {imports: [], exports: []}
-let decls = [];
-let scopes = [];
+import {File} from "./ast";
 
-function reset_tables(){
-        io.imports = [];
-        io.exports = [];
-        decls = [];
-}
+import {
+	// TODO: Add all AST nodes here
+} from "./ast/nodes";
+
 
 interface NearleyToken {
   value: any;
@@ -61,152 +61,241 @@ const grammar: Grammar = {
   Lexer: lexer,
   ParserRules: [
     {"name": "Program$ebnf$1", "symbols": []},
-    {"name": "Program$ebnf$1", "symbols": ["Program$ebnf$1", (lexer.has("NL") ? {type: "NL"} : NL)], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "Program$ebnf$1", "symbols": ["Program$ebnf$1", "LineEnd"], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "Program$ebnf$2", "symbols": []},
-    {"name": "Program$ebnf$2$subexpression$1$ebnf$1", "symbols": [(lexer.has("NL") ? {type: "NL"} : NL)]},
-    {"name": "Program$ebnf$2$subexpression$1$ebnf$1", "symbols": ["Program$ebnf$2$subexpression$1$ebnf$1", (lexer.has("NL") ? {type: "NL"} : NL)], "postprocess": (d) => d[0].concat([d[1]])},
-    {"name": "Program$ebnf$2$subexpression$1", "symbols": ["Statement", "Program$ebnf$2$subexpression$1$ebnf$1"]},
+    {"name": "Program$ebnf$2$subexpression$1$ebnf$1", "symbols": ["LineEnd"]},
+    {"name": "Program$ebnf$2$subexpression$1$ebnf$1", "symbols": ["Program$ebnf$2$subexpression$1$ebnf$1", "LineEnd"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "Program$ebnf$2$subexpression$1", "symbols": ["ImportDecl", "Program$ebnf$2$subexpression$1$ebnf$1"]},
     {"name": "Program$ebnf$2", "symbols": ["Program$ebnf$2", "Program$ebnf$2$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
-    {"name": "Program", "symbols": ["Program$ebnf$1", "Program$ebnf$2"], "postprocess": tokens => tokens[1].length ? tokens[1][0][0][0] : tokens[1]},
-    {"name": "Statement", "symbols": ["ImportStmt"]},
-    {"name": "Statement", "symbols": ["VarDeclStmt"]},
-    {"name": "Statement", "symbols": ["UnaryStmt"]},
-    {"name": "Statement", "symbols": ["AssignStmt"]},
-    {"name": "Statement", "symbols": ["IfStmt"]},
-    {"name": "Statement", "symbols": ["FuncDeclStmt"]},
-    {"name": "Statement", "symbols": ["ContinueStmt"]},
-    {"name": "Statement", "symbols": ["BreakStmt"]},
-    {"name": "Statement", "symbols": ["ReturnStmt"]},
-    {"name": "ImportStmt$ebnf$1$subexpression$1$subexpression$1", "symbols": ["ImportPath"]},
-    {"name": "ImportStmt$ebnf$1$subexpression$1$subexpression$1", "symbols": ["NameRef"]},
-    {"name": "ImportStmt$ebnf$1$subexpression$1", "symbols": [{"literal":"from"}, "ImportStmt$ebnf$1$subexpression$1$subexpression$1"]},
-    {"name": "ImportStmt$ebnf$1", "symbols": ["ImportStmt$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "ImportStmt$ebnf$1", "symbols": [], "postprocess": () => null},
-    {"name": "ImportStmt", "symbols": ["ImportStmt$ebnf$1", {"literal":"import"}, "ImportItemGroup"], "postprocess": 
-        ([from_part, _import, items]) => {
-            console.log('from', from_part);
-            console.log('items', items);
-            for(let item of items){
-                stmts.push();
-            }
-            return ...stmts;
+    {"name": "Program$ebnf$3", "symbols": []},
+    {"name": "Program$ebnf$3$subexpression$1$ebnf$1", "symbols": ["LineEnd"]},
+    {"name": "Program$ebnf$3$subexpression$1$ebnf$1", "symbols": ["Program$ebnf$3$subexpression$1$ebnf$1", "LineEnd"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "Program$ebnf$3$subexpression$1", "symbols": ["Statement", "Program$ebnf$3$subexpression$1$ebnf$1"]},
+    {"name": "Program$ebnf$3", "symbols": ["Program$ebnf$3", "Program$ebnf$3$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "Program", "symbols": ["Program$ebnf$1", "Program$ebnf$2", "Program$ebnf$3"], "postprocess": 
+        ([nl, imports, stmts]) => {
+        	return new ParserState(
+        		imports.map(function(d:object[]){ return d[0]; }).flat(Infinity),
+        		stmts.map(function(d:object[]){ return d[0]; }),
+        	);
         }
         },
-    {"name": "ImportPath", "symbols": [(lexer.has("StringWithoutEsc") ? {type: "StringWithoutEsc"} : StringWithoutEsc)], "postprocess": id},
-    {"name": "ImportItemGroup", "symbols": ["ImportItem"], "postprocess": id},
-    {"name": "ImportItemGroup", "symbols": ["ImportItemGroup", {"literal":","}, "ImportItem"], "postprocess": ([gp, _, item]) => [...gp, item]},
+    {"name": "ImportDecl$ebnf$1$subexpression$1$subexpression$1", "symbols": ["ImportPath"]},
+    {"name": "ImportDecl$ebnf$1$subexpression$1$subexpression$1", "symbols": ["NameRef"]},
+    {"name": "ImportDecl$ebnf$1$subexpression$1", "symbols": [{"literal":"from"}, "ImportDecl$ebnf$1$subexpression$1$subexpression$1"]},
+    {"name": "ImportDecl$ebnf$1", "symbols": ["ImportDecl$ebnf$1$subexpression$1"], "postprocess": id},
+    {"name": "ImportDecl$ebnf$1", "symbols": [], "postprocess": () => null},
+    {"name": "ImportDecl", "symbols": ["ImportDecl$ebnf$1", {"literal":"import"}, "ImportItemGroup"], "postprocess": 
+        ([_from, _import, items]) => {
+        	return {
+        		src: _from, 
+        		items: items
+        	};
+        }
+        },
+    {"name": "ImportPath", "symbols": [(lexer.has("StringWithoutEsc") ? {type: "StringWithoutEsc"} : StringWithoutEsc)]},
+    {"name": "ImportItemGroup$ebnf$1", "symbols": []},
+    {"name": "ImportItemGroup$ebnf$1$subexpression$1", "symbols": [{"literal":","}, "ImportItem"]},
+    {"name": "ImportItemGroup$ebnf$1", "symbols": ["ImportItemGroup$ebnf$1", "ImportItemGroup$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "ImportItemGroup", "symbols": ["ImportItem", "ImportItemGroup$ebnf$1"], "postprocess": 
+        items => items[1].length > 0 ? [items[0], ...items[1].map(function(d:object[]){ return d[1]; })] : [items[0]]
+        },
     {"name": "ImportItem$ebnf$1$subexpression$1", "symbols": [{"literal":"as"}, (lexer.has("Identifier") ? {type: "Identifier"} : Identifier)]},
     {"name": "ImportItem$ebnf$1", "symbols": ["ImportItem$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "ImportItem$ebnf$1", "symbols": [], "postprocess": () => null},
-    {"name": "ImportItem", "symbols": [(lexer.has("Identifier") ? {type: "Identifier"} : Identifier), "ImportItem$ebnf$1"], "postprocess": id},
-    {"name": "VarDeclStmt", "symbols": [{"literal":"let"}, "IdentList", {"literal":"="}, "ExprList"], "postprocess": 
-            
+    {"name": "ImportItem", "symbols": [(lexer.has("Identifier") ? {type: "Identifier"} : Identifier), "ImportItem$ebnf$1"], "postprocess":  
+        items => {
+        	return {
+        		name: items[0], 
+        		rename_as: items[1] === null ? null : items[1][1]
+        	};
+        }
         },
-    {"name": "UnaryStmt", "symbols": ["NameRef", {"literal":"++"}], "postprocess": tokens => new nodes.IncStmt(tokens)},
-    {"name": "UnaryStmt", "symbols": ["NameRef", {"literal":"--"}], "postprocess": tokens => new nodes.DecStmt(tokens)},
-    {"name": "AssignStmt", "symbols": ["NameRef", {"literal":"="}, "Expression"]},
-    {"name": "AssignStmt", "symbols": ["NameRef", {"literal":"+="}, "Expression"]},
-    {"name": "AssignStmt", "symbols": ["NameRef", {"literal":"-="}, "Expression"]},
-    {"name": "AssignStmt", "symbols": ["NameRef", {"literal":"*="}, "Expression"]},
-    {"name": "AssignStmt", "symbols": ["NameRef", {"literal":"/="}, "Expression"]},
-    {"name": "AssignStmt", "symbols": ["NameRef", {"literal":"%="}, "Expression"]},
-    {"name": "AssignStmt", "symbols": ["NameRef", {"literal":"<<="}, "Expression"]},
-    {"name": "AssignStmt", "symbols": ["NameRef", {"literal":">>="}, "Expression"]},
-    {"name": "AssignStmt", "symbols": ["NameRef", {"literal":"|="}, "Expression"]},
-    {"name": "AssignStmt", "symbols": ["NameRef", {"literal":"&="}, "Expression"]},
-    {"name": "AssignStmt", "symbols": ["NameRef", {"literal":"^="}, "Expression"]},
-    {"name": "FuncDeclStmt$ebnf$1", "symbols": ["ParamList"], "postprocess": id},
-    {"name": "FuncDeclStmt$ebnf$1", "symbols": [], "postprocess": () => null},
-    {"name": "FuncDeclStmt", "symbols": [{"literal":"func"}, (lexer.has("Identifier") ? {type: "Identifier"} : Identifier), {"literal":"("}, "FuncDeclStmt$ebnf$1", {"literal":")"}, "BlockExpr"]},
-    {"name": "IfStmt$ebnf$1$subexpression$1", "symbols": ["ElifStmt"]},
-    {"name": "IfStmt$ebnf$1$subexpression$1", "symbols": ["ElseStmt"]},
-    {"name": "IfStmt$ebnf$1", "symbols": ["IfStmt$ebnf$1$subexpression$1"], "postprocess": id},
+    {"name": "Declaration", "symbols": ["VarDecl"]},
+    {"name": "Declaration", "symbols": ["FuncDecl"]},
+    {"name": "Declaration", "symbols": ["EnumDecl"]},
+    {"name": "VarDecl", "symbols": [{"literal":"let"}, "VarNameList", {"literal":"="}, "ExprList"]},
+    {"name": "FuncDecl$ebnf$1$subexpression$1", "symbols": [{"literal":":"}, "Type"]},
+    {"name": "FuncDecl$ebnf$1", "symbols": ["FuncDecl$ebnf$1$subexpression$1"], "postprocess": id},
+    {"name": "FuncDecl$ebnf$1", "symbols": [], "postprocess": () => null},
+    {"name": "FuncDecl", "symbols": [{"literal":"func"}, (lexer.has("Identifier") ? {type: "Identifier"} : Identifier), {"literal":"("}, "VarNameList", {"literal":")"}, "FuncDecl$ebnf$1", "BlockExpr"]},
+    {"name": "EnumDecl$ebnf$1", "symbols": []},
+    {"name": "EnumDecl$ebnf$1$subexpression$1", "symbols": [{"literal":","}, "EnumItem"]},
+    {"name": "EnumDecl$ebnf$1", "symbols": ["EnumDecl$ebnf$1", "EnumDecl$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "EnumDecl", "symbols": [{"literal":"enum"}, (lexer.has("Identifier") ? {type: "Identifier"} : Identifier), {"literal":"{"}, "EnumItem", "EnumDecl$ebnf$1", {"literal":"}"}]},
+    {"name": "EnumItem$ebnf$1$subexpression$1", "symbols": [{"literal":"="}, "Literal"]},
+    {"name": "EnumItem$ebnf$1", "symbols": ["EnumItem$ebnf$1$subexpression$1"], "postprocess": id},
+    {"name": "EnumItem$ebnf$1", "symbols": [], "postprocess": () => null},
+    {"name": "EnumItem", "symbols": [(lexer.has("Identifier") ? {type: "Identifier"} : Identifier), "EnumItem$ebnf$1"]},
+    {"name": "Statement", "symbols": ["UnaryStmt"]},
+    {"name": "Statement", "symbols": ["AssignStmt"]},
+    {"name": "Statement", "symbols": ["IfStmt"]},
+    {"name": "Statement", "symbols": ["ContinueStmt"]},
+    {"name": "Statement", "symbols": ["BreakStmt"]},
+    {"name": "Statement", "symbols": ["ReturnStmt"]},
+    {"name": "UnaryStmt$subexpression$1", "symbols": ["NameRef"]},
+    {"name": "UnaryStmt$subexpression$1", "symbols": ["IndexingExpr"]},
+    {"name": "UnaryStmt", "symbols": ["UnaryStmt$subexpression$1", {"literal":"++"}]},
+    {"name": "UnaryStmt$subexpression$2", "symbols": ["NameRef"]},
+    {"name": "UnaryStmt$subexpression$2", "symbols": ["IndexingExpr"]},
+    {"name": "UnaryStmt", "symbols": ["UnaryStmt$subexpression$2", {"literal":"--"}]},
+    {"name": "AssignStmt", "symbols": ["VarNameList", {"literal":"="}, "ExprList"]},
+    {"name": "AssignStmt", "symbols": ["VarNameList", {"literal":"+="}, "ExprList"]},
+    {"name": "AssignStmt", "symbols": ["VarNameList", {"literal":"-="}, "ExprList"]},
+    {"name": "AssignStmt", "symbols": ["VarNameList", {"literal":"*="}, "ExprList"]},
+    {"name": "AssignStmt", "symbols": ["VarNameList", {"literal":"/="}, "ExprList"]},
+    {"name": "AssignStmt", "symbols": ["VarNameList", {"literal":"%="}, "ExprList"]},
+    {"name": "AssignStmt", "symbols": ["VarNameList", {"literal":"<<="}, "ExprList"]},
+    {"name": "AssignStmt", "symbols": ["VarNameList", {"literal":">>="}, "ExprList"]},
+    {"name": "AssignStmt", "symbols": ["VarNameList", {"literal":"|="}, "ExprList"]},
+    {"name": "AssignStmt", "symbols": ["VarNameList", {"literal":"&="}, "ExprList"]},
+    {"name": "AssignStmt", "symbols": ["VarNameList", {"literal":"^="}, "ExprList"]},
+    {"name": "IfStmt$ebnf$1", "symbols": ["ElifStmt"], "postprocess": id},
     {"name": "IfStmt$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "IfStmt", "symbols": [{"literal":"if"}, "Expression", "BlockExpr", "IfStmt$ebnf$1"]},
-    {"name": "ElifStmt$ebnf$1$subexpression$1", "symbols": ["ElifStmt"]},
-    {"name": "ElifStmt$ebnf$1$subexpression$1", "symbols": ["ElseStmt"]},
-    {"name": "ElifStmt$ebnf$1", "symbols": ["ElifStmt$ebnf$1$subexpression$1"], "postprocess": id},
+    {"name": "ElifStmt$ebnf$1", "symbols": ["ElifStmt"], "postprocess": id},
     {"name": "ElifStmt$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "ElifStmt", "symbols": [{"literal":"elif"}, "Expression", "BlockExpr", "ElifStmt$ebnf$1"]},
-    {"name": "ElseStmt", "symbols": [{"literal":"else"}, "BlockExpr"], "postprocess": },
-    {"name": "ContinueStmt", "symbols": [{"literal":"continue"}], "postprocess": [token] => new nodes.ContinueStmt(token)},
-    {"name": "BreakStmt", "symbols": [{"literal":"break"}], "postprocess": [token] => new nodes.BreakStmt(token)},
+    {"name": "ContinueStmt", "symbols": [{"literal":"continue"}]},
+    {"name": "BreakStmt", "symbols": [{"literal":"break"}]},
     {"name": "ReturnStmt$ebnf$1", "symbols": ["Expression"], "postprocess": id},
     {"name": "ReturnStmt$ebnf$1", "symbols": [], "postprocess": () => null},
-    {"name": "ReturnStmt", "symbols": [{"literal":"return"}, "ReturnStmt$ebnf$1"], "postprocess": [ret, expr] => new nodes.ReturnStmt(ret, expr)},
+    {"name": "ReturnStmt", "symbols": [{"literal":"return"}, "ReturnStmt$ebnf$1"]},
     {"name": "Expression", "symbols": [{"literal":"("}, "Expression", {"literal":")"}], "postprocess": tokens => tokens[1]},
-    {"name": "Expression", "symbols": ["CompareExpr"]},
     {"name": "Expression", "symbols": ["BinOpExpr"]},
     {"name": "Expression", "symbols": ["BoolOpExpr"]},
-    {"name": "Expression", "symbols": ["NameRef"]},
+    {"name": "Expression", "symbols": ["CompareExpr"]},
+    {"name": "Expression", "symbols": ["TupleExpr"]},
+    {"name": "Expression", "symbols": ["ArrayExpr"]},
     {"name": "Expression", "symbols": ["BlockExpr"]},
+    {"name": "Expression", "symbols": ["IndexingExpr"]},
     {"name": "Expression", "symbols": ["FunctionCallExpr"]},
+    {"name": "Expression", "symbols": ["RangeExpr"]},
+    {"name": "Expression", "symbols": ["NameRef"]},
+    {"name": "TernaryExpr", "symbols": ["Expression", {"literal":"?"}, "Expression", {"literal":":"}, "Expression"]},
+    {"name": "FunctionCallExpr$ebnf$1", "symbols": ["ExprList"], "postprocess": id},
+    {"name": "FunctionCallExpr$ebnf$1", "symbols": [], "postprocess": () => null},
+    {"name": "FunctionCallExpr$ebnf$2", "symbols": []},
+    {"name": "FunctionCallExpr$ebnf$2$subexpression$1", "symbols": [{"literal":"."}, "FunctionCallExpr"]},
+    {"name": "FunctionCallExpr$ebnf$2", "symbols": ["FunctionCallExpr$ebnf$2", "FunctionCallExpr$ebnf$2$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "FunctionCallExpr", "symbols": ["Expression", {"literal":"("}, "FunctionCallExpr$ebnf$1", {"literal":")"}, "FunctionCallExpr$ebnf$2"]},
     {"name": "BlockExpr$ebnf$1", "symbols": []},
-    {"name": "BlockExpr$ebnf$1$subexpression$1$ebnf$1", "symbols": [(lexer.has("NL") ? {type: "NL"} : NL)]},
-    {"name": "BlockExpr$ebnf$1$subexpression$1$ebnf$1", "symbols": ["BlockExpr$ebnf$1$subexpression$1$ebnf$1", (lexer.has("NL") ? {type: "NL"} : NL)], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "BlockExpr$ebnf$1$subexpression$1$ebnf$1", "symbols": ["LineEnd"]},
+    {"name": "BlockExpr$ebnf$1$subexpression$1$ebnf$1", "symbols": ["BlockExpr$ebnf$1$subexpression$1$ebnf$1", "LineEnd"], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "BlockExpr$ebnf$1$subexpression$1", "symbols": ["Statement", "BlockExpr$ebnf$1$subexpression$1$ebnf$1"]},
     {"name": "BlockExpr$ebnf$1", "symbols": ["BlockExpr$ebnf$1", "BlockExpr$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "BlockExpr", "symbols": [{"literal":"{"}, "BlockExpr$ebnf$1", {"literal":"}"}]},
-    {"name": "CompareExpr", "symbols": ["Expression", {"literal":"=="}, "Expression"], "postprocess": [lhs, _, rhs] => new nodes.Equal(lhs, rhs)},
-    {"name": "CompareExpr", "symbols": ["Expression", {"literal":"!="}, "Expression"], "postprocess": [lhs, _, rhs] => new nodes.NotEqual(lhs, rhs)},
-    {"name": "CompareExpr", "symbols": ["Expression", {"literal":"<"}, "Expression"], "postprocess": [lhs, _, rhs] => new nodes.Less(lhs, rhs)},
-    {"name": "CompareExpr", "symbols": ["Expression", {"literal":"<="}, "Expression"], "postprocess": [lhs, _, rhs] => new nodes.LessThan(lhs, rhs)},
-    {"name": "CompareExpr", "symbols": ["Expression", {"literal":">"}, "Expression"], "postprocess": [lhs, _, rhs] => new nodes.Greater(lhs, rhs)},
-    {"name": "CompareExpr", "symbols": ["Expression", {"literal":">="}, "Expression"], "postprocess": [lhs, _, rhs] => new nodes.GreaterEqual(lhs, rhs)},
     {"name": "BinOpExpr", "symbols": ["BinOr"]},
     {"name": "BinOr", "symbols": ["BinXor"]},
-    {"name": "BinOr", "symbols": ["BinOr", {"literal":"|"}, "BinXor"], "postprocess": [lhs, _, rhs] => new nodes.BinOr(lhs, rhs)},
+    {"name": "BinOr", "symbols": ["BinOr", {"literal":"|"}, "BinXor"]},
     {"name": "BinXor", "symbols": ["BinAnd"]},
-    {"name": "BinXor", "symbols": ["BinXor", {"literal":"^"}, "BinAnd"], "postprocess": [lhs, _, rhs] => new nodes.BinXor(lhs, rhs)},
+    {"name": "BinXor", "symbols": ["BinXor", {"literal":"^"}, "BinAnd"]},
     {"name": "BinAnd", "symbols": ["BinShift"]},
-    {"name": "BinAnd", "symbols": ["BinAnd", {"literal":"&"}, "BinShift"], "postprocess": [lhs, _, rhs] => new nodes.BinAnd(lhs, rhs)},
+    {"name": "BinAnd", "symbols": ["BinAnd", {"literal":"&"}, "BinShift"]},
     {"name": "BinShift", "symbols": ["BinAddSub"]},
-    {"name": "BinShift", "symbols": ["BinShift", {"literal":"<<"}, "BinAddSub"], "postprocess": [lhs, _, rhs] => new nodes.Shl(lhs, rhs)},
-    {"name": "BinShift", "symbols": ["BinShift", {"literal":">>"}, "BinAddSub"], "postprocess": [lhs, _, rhs] => new nodes.Shr(lhs, rhs)},
+    {"name": "BinShift", "symbols": ["BinShift", {"literal":"<<"}, "BinAddSub"]},
+    {"name": "BinShift", "symbols": ["BinShift", {"literal":">>"}, "BinAddSub"]},
     {"name": "BinAddSub", "symbols": ["BinMulDiv"]},
-    {"name": "BinAddSub", "symbols": ["BinAddSub", {"literal":"-"}, "BinMulDiv"], "postprocess": [lhs, _, rhs] => new nodes.Sub(lhs, rhs)},
-    {"name": "BinAddSub", "symbols": ["BinAddSub", {"literal":"+"}, "BinMulDiv"], "postprocess": [lhs, _, rhs] => new nodes.Add(lhs, rhs)},
+    {"name": "BinAddSub", "symbols": ["BinAddSub", {"literal":"-"}, "BinMulDiv"]},
+    {"name": "BinAddSub", "symbols": ["BinAddSub", {"literal":"+"}, "BinMulDiv"]},
     {"name": "BinMulDiv", "symbols": ["BinUnary"]},
-    {"name": "BinMulDiv", "symbols": ["BinMulDiv", {"literal":"*"}, "BinUnary"], "postprocess": [lhs, _, rhs] => new nodes.Mul(lhs, rhs)},
-    {"name": "BinMulDiv", "symbols": ["BinMulDiv", {"literal":"/"}, "BinUnary"], "postprocess": [lhs, _, rhs] => new nodes.Div(lhs, rhs)},
-    {"name": "BinMulDiv", "symbols": ["BinMulDiv", {"literal":"%"}, "BinUnary"], "postprocess": [lhs, _, rhs] => new nodes.Mod(lhs, rhs)},
-    {"name": "BinUnary", "symbols": ["Literal"], "postprocess": id},
-    {"name": "BinUnary", "symbols": [{"literal":"!"}, "Literal"], "postprocess": [sym, expr] => new nodes.BinNot(sym, expr)},
-    {"name": "BinUnary", "symbols": [{"literal":"-"}, "Literal"], "postprocess": [sym, expr] => new nodes.Neg(sym, expr)},
+    {"name": "BinMulDiv", "symbols": ["BinMulDiv", {"literal":"*"}, "BinUnary"]},
+    {"name": "BinMulDiv", "symbols": ["BinMulDiv", {"literal":"/"}, "BinUnary"]},
+    {"name": "BinMulDiv", "symbols": ["BinMulDiv", {"literal":"%"}, "BinUnary"]},
+    {"name": "BinUnary", "symbols": ["Literal"]},
+    {"name": "BinUnary", "symbols": [{"literal":"!"}, "Literal"]},
+    {"name": "BinUnary", "symbols": [{"literal":"-"}, "Literal"]},
     {"name": "BoolOpExpr", "symbols": ["BoolOr"]},
     {"name": "BoolOr", "symbols": ["BoolXor"]},
-    {"name": "BoolOr", "symbols": ["BoolOr", {"literal":"or"}, "BoolXor"], "postprocess": [lhs, _, rhs] => new nodes.BoolOr(lhs, rhs)},
+    {"name": "BoolOr", "symbols": ["BoolOr", {"literal":"or"}, "BoolXor"]},
     {"name": "BoolXor", "symbols": ["BoolAnd"]},
-    {"name": "BoolXor", "symbols": ["BoolXor", {"literal":"xor"}, "BoolAnd"], "postprocess": [lhs, _, rhs] => new nodes.BoolXor(lhs, rhs)},
+    {"name": "BoolXor", "symbols": ["BoolXor", {"literal":"xor"}, "BoolAnd"]},
     {"name": "BoolAnd", "symbols": ["BoolNot"]},
-    {"name": "BoolAnd", "symbols": ["BoolAnd", {"literal":"and"}, "BoolNot"], "postprocess": [lhs, _, rhs] => new nodes.BoolAnd(lhs, rhs)},
+    {"name": "BoolAnd", "symbols": ["BoolAnd", {"literal":"and"}, "BoolNot"]},
     {"name": "BoolNot$ebnf$1", "symbols": [{"literal":"not"}], "postprocess": id},
     {"name": "BoolNot$ebnf$1", "symbols": [], "postprocess": () => null},
-    {"name": "BoolNot", "symbols": ["BoolNot$ebnf$1", "CompareExpr"], "postprocess": 
-        [not, expr] => {
-                console.log(not, expr);
+    {"name": "BoolNot", "symbols": ["BoolNot$ebnf$1", "CompareExpr"]},
+    {"name": "CompareExpr", "symbols": ["Expression", {"literal":"=="}, "Expression"]},
+    {"name": "CompareExpr", "symbols": ["Expression", {"literal":"!="}, "Expression"]},
+    {"name": "CompareExpr$ebnf$1", "symbols": [{"literal":"not"}], "postprocess": id},
+    {"name": "CompareExpr$ebnf$1", "symbols": [], "postprocess": () => null},
+    {"name": "CompareExpr", "symbols": ["Expression", "CompareExpr$ebnf$1", {"literal":"in"}, "Expression"]},
+    {"name": "CompareExpr$ebnf$2$subexpression$1$subexpression$1", "symbols": [{"literal":"<"}]},
+    {"name": "CompareExpr$ebnf$2$subexpression$1$subexpression$1", "symbols": [{"literal":">"}]},
+    {"name": "CompareExpr$ebnf$2$subexpression$1$subexpression$1", "symbols": [{"literal":"<="}]},
+    {"name": "CompareExpr$ebnf$2$subexpression$1$subexpression$1", "symbols": [{"literal":">="}]},
+    {"name": "CompareExpr$ebnf$2$subexpression$1", "symbols": ["CompareExpr$ebnf$2$subexpression$1$subexpression$1", "Expression"]},
+    {"name": "CompareExpr$ebnf$2", "symbols": ["CompareExpr$ebnf$2$subexpression$1"]},
+    {"name": "CompareExpr$ebnf$2$subexpression$2$subexpression$1", "symbols": [{"literal":"<"}]},
+    {"name": "CompareExpr$ebnf$2$subexpression$2$subexpression$1", "symbols": [{"literal":">"}]},
+    {"name": "CompareExpr$ebnf$2$subexpression$2$subexpression$1", "symbols": [{"literal":"<="}]},
+    {"name": "CompareExpr$ebnf$2$subexpression$2$subexpression$1", "symbols": [{"literal":">="}]},
+    {"name": "CompareExpr$ebnf$2$subexpression$2", "symbols": ["CompareExpr$ebnf$2$subexpression$2$subexpression$1", "Expression"]},
+    {"name": "CompareExpr$ebnf$2", "symbols": ["CompareExpr$ebnf$2", "CompareExpr$ebnf$2$subexpression$2"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "CompareExpr", "symbols": ["Expression", "CompareExpr$ebnf$2"]},
+    {"name": "Literal", "symbols": [(lexer.has("DecLiteral") ? {type: "DecLiteral"} : DecLiteral)]},
+    {"name": "Literal", "symbols": [(lexer.has("BinLiteral") ? {type: "BinLiteral"} : BinLiteral)]},
+    {"name": "Literal", "symbols": [(lexer.has("HexLiteral") ? {type: "HexLiteral"} : HexLiteral)]},
+    {"name": "Literal", "symbols": [(lexer.has("TrueLiteral") ? {type: "TrueLiteral"} : TrueLiteral)]},
+    {"name": "Literal", "symbols": [(lexer.has("FalseLiteral") ? {type: "FalseLiteral"} : FalseLiteral)]},
+    {"name": "Literal", "symbols": [(lexer.has("FloatLiteral") ? {type: "FloatLiteral"} : FloatLiteral)]},
+    {"name": "Literal", "symbols": [(lexer.has("SciNotationLiteral") ? {type: "SciNotationLiteral"} : SciNotationLiteral)]},
+    {"name": "Literal", "symbols": [(lexer.has("StringWithoutEsc") ? {type: "StringWithoutEsc"} : StringWithoutEsc)]},
+    {"name": "Literal", "symbols": [(lexer.has("Character") ? {type: "Character"} : Character)]},
+    {"name": "RangeExpr$ebnf$1", "symbols": ["Expression"], "postprocess": id},
+    {"name": "RangeExpr$ebnf$1", "symbols": [], "postprocess": () => null},
+    {"name": "RangeExpr$ebnf$2", "symbols": ["Expression"], "postprocess": id},
+    {"name": "RangeExpr$ebnf$2", "symbols": [], "postprocess": () => null},
+    {"name": "RangeExpr$ebnf$3$subexpression$1", "symbols": [{"literal":":"}, "Expression"]},
+    {"name": "RangeExpr$ebnf$3", "symbols": ["RangeExpr$ebnf$3$subexpression$1"], "postprocess": id},
+    {"name": "RangeExpr$ebnf$3", "symbols": [], "postprocess": () => null},
+    {"name": "RangeExpr", "symbols": ["RangeExpr$ebnf$1", {"literal":":"}, "RangeExpr$ebnf$2", "RangeExpr$ebnf$3"]},
+    {"name": "TupleExpr$ebnf$1$subexpression$1", "symbols": ["Expression", {"literal":","}]},
+    {"name": "TupleExpr$ebnf$1", "symbols": ["TupleExpr$ebnf$1$subexpression$1"]},
+    {"name": "TupleExpr$ebnf$1$subexpression$2", "symbols": ["Expression", {"literal":","}]},
+    {"name": "TupleExpr$ebnf$1", "symbols": ["TupleExpr$ebnf$1", "TupleExpr$ebnf$1$subexpression$2"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "TupleExpr$ebnf$2", "symbols": ["Expression"], "postprocess": id},
+    {"name": "TupleExpr$ebnf$2", "symbols": [], "postprocess": () => null},
+    {"name": "TupleExpr", "symbols": [{"literal":"("}, "TupleExpr$ebnf$1", "TupleExpr$ebnf$2", {"literal":")"}]},
+    {"name": "ArrayExpr$ebnf$1", "symbols": ["Expression"], "postprocess": id},
+    {"name": "ArrayExpr$ebnf$1", "symbols": [], "postprocess": () => null},
+    {"name": "ArrayExpr$ebnf$2", "symbols": []},
+    {"name": "ArrayExpr$ebnf$2$subexpression$1", "symbols": [{"literal":","}, "Expression"]},
+    {"name": "ArrayExpr$ebnf$2", "symbols": ["ArrayExpr$ebnf$2", "ArrayExpr$ebnf$2$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "ArrayExpr", "symbols": [{"literal":"["}, "ArrayExpr$ebnf$1", "ArrayExpr$ebnf$2", {"literal":"]"}]},
+    {"name": "IndexingExpr", "symbols": ["Expression", {"literal":"["}, "Expression", {"literal":"]"}]},
+    {"name": "ExprList$ebnf$1", "symbols": []},
+    {"name": "ExprList$ebnf$1$subexpression$1", "symbols": [{"literal":","}, "Expression"]},
+    {"name": "ExprList$ebnf$1", "symbols": ["ExprList$ebnf$1", "ExprList$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "ExprList", "symbols": ["Expression", "ExprList$ebnf$1"]},
+    {"name": "VarNameList$ebnf$1", "symbols": []},
+    {"name": "VarNameList$ebnf$1$subexpression$1", "symbols": [{"literal":","}, "VarName"]},
+    {"name": "VarNameList$ebnf$1", "symbols": ["VarNameList$ebnf$1", "VarNameList$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "VarNameList", "symbols": ["VarName", "VarNameList$ebnf$1"]},
+    {"name": "VarName$ebnf$1$subexpression$1", "symbols": [{"literal":":"}, "Type"]},
+    {"name": "VarName$ebnf$1", "symbols": ["VarName$ebnf$1$subexpression$1"], "postprocess": id},
+    {"name": "VarName$ebnf$1", "symbols": [], "postprocess": () => null},
+    {"name": "VarName", "symbols": [(lexer.has("Identifier") ? {type: "Identifier"} : Identifier), "VarName$ebnf$1"]},
+    {"name": "Type", "symbols": ["NameRef"]},
+    {"name": "Type", "symbols": ["NameRef", {"literal":"*"}]},
+    {"name": "Type", "symbols": ["NameRef", {"literal":"[]"}]},
+    {"name": "Type$ebnf$1$subexpression$1", "symbols": ["NameRef", {"literal":","}]},
+    {"name": "Type$ebnf$1", "symbols": ["Type$ebnf$1$subexpression$1"]},
+    {"name": "Type$ebnf$1$subexpression$2", "symbols": ["NameRef", {"literal":","}]},
+    {"name": "Type$ebnf$1", "symbols": ["Type$ebnf$1", "Type$ebnf$1$subexpression$2"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "Type$ebnf$2", "symbols": ["NameRef"], "postprocess": id},
+    {"name": "Type$ebnf$2", "symbols": [], "postprocess": () => null},
+    {"name": "Type", "symbols": [{"literal":"("}, "Type$ebnf$1", "Type$ebnf$2", {"literal":")"}]},
+    {"name": "NameRef$subexpression$1", "symbols": [{"literal":"."}, "Name"]},
+    {"name": "NameRef", "symbols": ["Name", "NameRef$subexpression$1"]},
+    {"name": "Name$ebnf$1", "symbols": [{"literal":"@"}], "postprocess": id},
+    {"name": "Name$ebnf$1", "symbols": [], "postprocess": () => null},
+    {"name": "Name", "symbols": ["Name$ebnf$1", (lexer.has("Identifier") ? {type: "Identifier"} : Identifier)]},
+    {"name": "LineEnd", "symbols": [(lexer.has("SLC") ? {type: "SLC"} : SLC)]},
+    {"name": "LineEnd", "symbols": [(lexer.has("MLC") ? {type: "MLC"} : MLC)]},
+    {"name": "LineEnd", "symbols": [(lexer.has("NL") ? {type: "NL"} : NL)], "postprocess": 
+        ([item]) => item
         }
-        },
-    {"name": "Literal", "symbols": [(lexer.has("DecLiteral") ? {type: "DecLiteral"} : DecLiteral)], "postprocess": [tok] => return new nodes.Literal(tok)},
-    {"name": "Literal", "symbols": [(lexer.has("BinLiteral") ? {type: "BinLiteral"} : BinLiteral)], "postprocess": [tok] => return new nodes.Literal(tok)},
-    {"name": "Literal", "symbols": [(lexer.has("HexLiteral") ? {type: "HexLiteral"} : HexLiteral)], "postprocess": [tok] => return new nodes.Literal(tok)},
-    {"name": "Literal", "symbols": [(lexer.has("TrueLiteral") ? {type: "TrueLiteral"} : TrueLiteral)], "postprocess": [tok] => return new nodes.Literal(tok)},
-    {"name": "Literal", "symbols": [(lexer.has("FalseLiteral") ? {type: "FalseLiteral"} : FalseLiteral)], "postprocess": [tok] => return new nodes.Literal(tok)},
-    {"name": "Literal", "symbols": [(lexer.has("FloatLiteral") ? {type: "FloatLiteral"} : FloatLiteral)], "postprocess": [tok] => return new nodes.Literal(tok)},
-    {"name": "Literal", "symbols": [(lexer.has("SciNotationLiteral") ? {type: "SciNotationLiteral"} : SciNotationLiteral)], "postprocess": [tok] => return new nodes.Literal(tok)},
-    {"name": "Literal", "symbols": [(lexer.has("StringWithoutEsc") ? {type: "StringWithoutEsc"} : StringWithoutEsc)], "postprocess": [tok] => return new nodes.Literal(tok)},
-    {"name": "FunctionCallExpr$ebnf$1", "symbols": ["ExprList"], "postprocess": id},
-    {"name": "FunctionCallExpr$ebnf$1", "symbols": [], "postprocess": () => null},
-    {"name": "FunctionCallExpr", "symbols": ["NameRef", {"literal":"("}, "FunctionCallExpr$ebnf$1", {"literal":")"}]},
-    {"name": "ExprList", "symbols": ["Expression"], "postprocess": tokens => [tokens[0]]},
-    {"name": "ExprList", "symbols": ["ExprList", {"literal":","}, "Expression"], "postprocess": tokens => [...tokens[0], tokens[2]]},
-    {"name": "IdentList", "symbols": [(lexer.has("Identifier") ? {type: "Identifier"} : Identifier)], "postprocess": tokens => [tokens[0]]},
-    {"name": "IdentList", "symbols": ["IdentList", {"literal":","}, (lexer.has("Identifier") ? {type: "Identifier"} : Identifier)], "postprocess": tokens => [...tokens[0], tokens[2]]},
-    {"name": "ParamList", "symbols": ["ParameterDecl"], "postprocess": tokens => [tokens[0]]},
-    {"name": "ParamList", "symbols": ["ParamList", {"literal":","}, "ParameterDecl"], "postprocess": tokens => [...tokens[0], tokens[2]]},
-    {"name": "NameRef", "symbols": [(lexer.has("Identifier") ? {type: "Identifier"} : Identifier)], "postprocess": tokens => [tokens[0]]},
-    {"name": "NameRef", "symbols": ["NameRef", {"literal":"."}, (lexer.has("Identifier") ? {type: "Identifier"} : Identifier)], "postprocess": ([refs, _, name]) => [...refs, name]},
-    {"name": "ParameterDecl", "symbols": ["NameRef", (lexer.has("Identifier") ? {type: "Identifier"} : Identifier)], "postprocess": [_type, name] => {}}
   ],
   ParserStart: "Program",
 };
