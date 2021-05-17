@@ -18,13 +18,11 @@ Program -> LineEnd:* (ImportDecl LineEnd:+):* (Statement LineEnd:+):*
 {%
 	([nl, imports, stmts]) => {
 		let comments: object[] = [...nl.flat(Infinity)];
-		imports.forEach((item: any) => {
-			comments.push(...item[1]);
-		});
+		imports.forEach((item: any) => {comments.push(...item[1]);});
 		return {
-			imports: imports.map(function(d:object[]){ return d[0]; }).flat(Infinity),
-			tree: stmts.map(function(d:object[]){ return d[0]; }),
-			comments: comments.filter((item: any) => item.type != 'NL'),
+			imports: imports.map((d:object[]) => d[0]).flat(Infinity),
+			tree: stmts.map((d:object[]) => d[0]),
+			comments: comments.filter((item: any) => item.type != 'NL')
 		}
 	}
 %}
@@ -44,7 +42,7 @@ ImportPath -> %String
 
 ImportItemGroup -> ImportItem ("," ImportItem):*
 {%
-	items => items[1].length > 0 ? [items[0], ...items[1].map(function(d:object[]){ return d[1]; })] : [items[0]]
+	items => items[1].length > 0 ? [items[0], ...items[1].map((d:object[]) => d[1])] : [items[0]]
 %}
 
 ImportItem -> %Identifier ("as" %Identifier):?

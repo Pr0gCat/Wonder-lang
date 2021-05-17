@@ -4,17 +4,18 @@
 import {extname, basename} from "path";
 
 export class Namespace {
-	constructor(){
+	/**
+	 * @param name Identifier between namespaces
+	 */
+	constructor(
+		public name: string,
 
-	}
+	){}
 }
 
 // Representing a source code file, maintain an AST.
-export class File {
-	/**
-	 * @property name Identifier between namespaces
-	 */
-	name: string;
+export class File extends Namespace {
+	
 	/**
 	 * @param path File path
 	 * @param lines Lines of code
@@ -29,9 +30,7 @@ export class File {
 		public tree: object[],
 		public comments: object[]
 	) {
-		let extension = extname(path);
-        this.name = extension.length > 0 ? basename(path, extension) : basename(path);
-		this.name = this.name.replace('.', '_');
+		super((extname(path).length > 0 ? basename(path, extname(path)) : basename(path)).replace('.', '_'));
 	}
 }
 
@@ -39,7 +38,7 @@ export class File {
 // One Package for each project.
 export class Package {
 	// The first namespace must be root namespace.
-	private symbol_table: {} = {'@': new Namespace()};
+	private symbol_table: {} = {'@': new Namespace('@')};
 	private files: File[] = [];
 
 	/**

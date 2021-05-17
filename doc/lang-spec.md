@@ -155,10 +155,16 @@ VarDecl -> "let" NameList "=" ExprList
 ### Function Declaration
 
 ```
-FuncDecl -> "func"
+FuncDecl -> "func" %Identifier "(" VarNameList ")" (":" Type):? BlockExpr
 ```
 
 ### Enumerate Declaration
+
+```
+EnumDecl -> "enum" %Identifier "{" EnumItem ("," EnumItem):* "}"
+
+EnumItem -> %Identifier ("=" Literal):?
+```
 
 ### Structure Declaration
 

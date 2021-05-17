@@ -22,6 +22,7 @@ export interface ParseResult {
 export default class Parser {
     rules: Grammar;
     core_parser: NearleyParser;
+
     constructor() {
         this.rules = Grammar.fromCompiled(grammar);
         this.core_parser = new NearleyParser(this.rules);
@@ -34,10 +35,10 @@ export default class Parser {
      * @throws Error if nothing return
      */
     public parse(text: string): ParseResult {
-        if(text.length == 0) return {imports: [], tree: [], comments: []};
+        if (text.length == 0) return { imports: [], tree: [], comments: [] };
         text += '\n';
         this.core_parser.feed(text);
-        if(this.core_parser.results !== undefined){
+        if (this.core_parser.results !== undefined) {
             return this.core_parser.results[0];
         }
         throw Error('Nothing return');
@@ -47,8 +48,8 @@ export default class Parser {
      * @param path File to read
      * @returns File object
      */
-    public parseFile(path: string){
-        let content = fs.readFileSync(path, {encoding: "utf-8"});
+    public parseFile(path: string) {
+        let content = fs.readFileSync(path, { encoding: "utf-8" });
         let result = this.parse(content);
         // reset parser
         this.resetState();
