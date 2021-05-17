@@ -3,7 +3,7 @@
 // Bypasses TS6133. Allow declared but unused functions.
 // @ts-ignore
 function id(d: any[]): any { return d[0]; }
-declare var StringWithoutEsc: any;
+declare var String: any;
 declare var Identifier: any;
 declare var DecLiteral: any;
 declare var BinLiteral: any;
@@ -12,18 +12,14 @@ declare var TrueLiteral: any;
 declare var FalseLiteral: any;
 declare var FloatLiteral: any;
 declare var SciNotationLiteral: any;
+declare var StringWithoutEsc: any;
 declare var Character: any;
-declare var SLC: any;
-declare var MLC: any;
+declare var Comment: any;
 declare var NL: any;
 
 // issue: https://github.com/kach/nearley/issues/527#issuecomment-734847077
 import { default as lexer_moo} from "./lexer";
 const lexer = (lexer_moo as unknown) as NearleyLexer;
-
-import {ParserState} from "./parser";
-
-import {File} from "./ast";
 
 import {
 	// TODO: Add all AST nodes here
@@ -74,10 +70,15 @@ const grammar: Grammar = {
     {"name": "Program$ebnf$3", "symbols": ["Program$ebnf$3", "Program$ebnf$3$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "Program", "symbols": ["Program$ebnf$1", "Program$ebnf$2", "Program$ebnf$3"], "postprocess": 
         ([nl, imports, stmts]) => {
-        	return new ParserState(
-        		imports.map(function(d:object[]){ return d[0]; }).flat(Infinity),
-        		stmts.map(function(d:object[]){ return d[0]; }),
-        	);
+        	let comments: object[] = [...nl.flat(Infinity)];
+        	imports.forEach((item: any) => {
+        		comments.push(...item[1]);
+        	});
+        	return {
+        		imports: imports.map(function(d:object[]){ return d[0]; }).flat(Infinity),
+        		tree: stmts.map(function(d:object[]){ return d[0]; }),
+        		comments: comments.filter((item: any) => item.type != 'NL'),
+        	}
         }
         },
     {"name": "ImportDecl$ebnf$1$subexpression$1$subexpression$1", "symbols": ["ImportPath"]},
@@ -88,12 +89,12 @@ const grammar: Grammar = {
     {"name": "ImportDecl", "symbols": ["ImportDecl$ebnf$1", {"literal":"import"}, "ImportItemGroup"], "postprocess": 
         ([_from, _import, items]) => {
         	return {
-        		src: _from, 
+        		src: _from,
         		items: items
         	};
         }
         },
-    {"name": "ImportPath", "symbols": [(lexer.has("StringWithoutEsc") ? {type: "StringWithoutEsc"} : StringWithoutEsc)]},
+    {"name": "ImportPath", "symbols": [(lexer.has("String") ? {type: "String"} : String)]},
     {"name": "ImportItemGroup$ebnf$1", "symbols": []},
     {"name": "ImportItemGroup$ebnf$1$subexpression$1", "symbols": [{"literal":","}, "ImportItem"]},
     {"name": "ImportItemGroup$ebnf$1", "symbols": ["ImportItemGroup$ebnf$1", "ImportItemGroup$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
@@ -103,10 +104,10 @@ const grammar: Grammar = {
     {"name": "ImportItem$ebnf$1$subexpression$1", "symbols": [{"literal":"as"}, (lexer.has("Identifier") ? {type: "Identifier"} : Identifier)]},
     {"name": "ImportItem$ebnf$1", "symbols": ["ImportItem$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "ImportItem$ebnf$1", "symbols": [], "postprocess": () => null},
-    {"name": "ImportItem", "symbols": [(lexer.has("Identifier") ? {type: "Identifier"} : Identifier), "ImportItem$ebnf$1"], "postprocess":  
+    {"name": "ImportItem", "symbols": [(lexer.has("Identifier") ? {type: "Identifier"} : Identifier), "ImportItem$ebnf$1"], "postprocess": 
         items => {
         	return {
-        		name: items[0], 
+        		name: items[0],
         		rename_as: items[1] === null ? null : items[1][1]
         	};
         }
@@ -276,26 +277,24 @@ const grammar: Grammar = {
     {"name": "VarName$ebnf$1", "symbols": ["VarName$ebnf$1$subexpression$1"], "postprocess": id},
     {"name": "VarName$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "VarName", "symbols": [(lexer.has("Identifier") ? {type: "Identifier"} : Identifier), "VarName$ebnf$1"]},
-    {"name": "Type", "symbols": ["NameRef"]},
-    {"name": "Type", "symbols": ["NameRef", {"literal":"*"}]},
-    {"name": "Type", "symbols": ["NameRef", {"literal":"[]"}]},
-    {"name": "Type$ebnf$1$subexpression$1", "symbols": ["NameRef", {"literal":","}]},
-    {"name": "Type$ebnf$1", "symbols": ["Type$ebnf$1$subexpression$1"]},
-    {"name": "Type$ebnf$1$subexpression$2", "symbols": ["NameRef", {"literal":","}]},
-    {"name": "Type$ebnf$1", "symbols": ["Type$ebnf$1", "Type$ebnf$1$subexpression$2"], "postprocess": (d) => d[0].concat([d[1]])},
-    {"name": "Type$ebnf$2", "symbols": ["NameRef"], "postprocess": id},
-    {"name": "Type$ebnf$2", "symbols": [], "postprocess": () => null},
-    {"name": "Type", "symbols": [{"literal":"("}, "Type$ebnf$1", "Type$ebnf$2", {"literal":")"}]},
-    {"name": "NameRef$subexpression$1", "symbols": [{"literal":"."}, "Name"]},
-    {"name": "NameRef", "symbols": ["Name", "NameRef$subexpression$1"]},
-    {"name": "Name$ebnf$1", "symbols": [{"literal":"@"}], "postprocess": id},
-    {"name": "Name$ebnf$1", "symbols": [], "postprocess": () => null},
-    {"name": "Name", "symbols": ["Name$ebnf$1", (lexer.has("Identifier") ? {type: "Identifier"} : Identifier)]},
-    {"name": "LineEnd", "symbols": [(lexer.has("SLC") ? {type: "SLC"} : SLC)]},
-    {"name": "LineEnd", "symbols": [(lexer.has("MLC") ? {type: "MLC"} : MLC)]},
-    {"name": "LineEnd", "symbols": [(lexer.has("NL") ? {type: "NL"} : NL)], "postprocess": 
-        ([item]) => item
-        }
+    {"name": "Type$ebnf$1", "symbols": []},
+    {"name": "Type$ebnf$1$subexpression$1", "symbols": [{"literal":"|"}, "_PrimitiveTypes"]},
+    {"name": "Type$ebnf$1", "symbols": ["Type$ebnf$1", "Type$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "Type", "symbols": ["_PrimitiveTypes", "Type$ebnf$1"]},
+    {"name": "_PrimitiveTypes", "symbols": ["NameRef"]},
+    {"name": "_PrimitiveTypes", "symbols": ["NameRef", {"literal":"*"}]},
+    {"name": "_PrimitiveTypes", "symbols": ["NameRef", {"literal":"[]"}]},
+    {"name": "_PrimitiveTypes$ebnf$1$subexpression$1", "symbols": ["NameRef", {"literal":","}]},
+    {"name": "_PrimitiveTypes$ebnf$1", "symbols": ["_PrimitiveTypes$ebnf$1$subexpression$1"]},
+    {"name": "_PrimitiveTypes$ebnf$1$subexpression$2", "symbols": ["NameRef", {"literal":","}]},
+    {"name": "_PrimitiveTypes$ebnf$1", "symbols": ["_PrimitiveTypes$ebnf$1", "_PrimitiveTypes$ebnf$1$subexpression$2"], "postprocess": (d) => d[0].concat([d[1]])},
+    {"name": "_PrimitiveTypes$ebnf$2", "symbols": ["NameRef"], "postprocess": id},
+    {"name": "_PrimitiveTypes$ebnf$2", "symbols": [], "postprocess": () => null},
+    {"name": "_PrimitiveTypes", "symbols": [{"literal":"("}, "_PrimitiveTypes$ebnf$1", "_PrimitiveTypes$ebnf$2", {"literal":")"}]},
+    {"name": "NameRef$subexpression$1", "symbols": [{"literal":"."}, (lexer.has("Identifier") ? {type: "Identifier"} : Identifier)]},
+    {"name": "NameRef", "symbols": [(lexer.has("Identifier") ? {type: "Identifier"} : Identifier), "NameRef$subexpression$1"]},
+    {"name": "LineEnd", "symbols": [(lexer.has("Comment") ? {type: "Comment"} : Comment)]},
+    {"name": "LineEnd", "symbols": [(lexer.has("NL") ? {type: "NL"} : NL)], "postprocess": id}
   ],
   ParserStart: "Program",
 };

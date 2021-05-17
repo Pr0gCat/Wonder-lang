@@ -5,17 +5,16 @@ All syntax is written in Nearley with EBNF style.
 ## Tokens and Reserved Words
 
 **Tokens**
-|Token|Description|Regrex|
-|-|-|-|
-|%NL|NewLine|`\r\n\|\n`|
-|%Identifier|Identifier|`[_a-zA-Z][\w]*`|
-|%DecLiteral|Decimal Number|`0\|[0-9]\d+`|
-|%HexLiteral|Hexadecimal Number|`0x[0-9a-fA-F]+`|
-|%BinLiteral|Binary number|`[10_]+b`|
-|%FloatLiteral|Floating point|`(?:0\|[0-9]\d+)?\.\d+`|
-|%SciNotationLiteral|Scientific Notation|`(?:${float_regex})[eE][-]?\\d+`|
-|%Character|Character|`'.+'`|
-|%NoEscapeString|String without escape characters|`"(?:\\["\\]\|[^\n"\\])*"`|
+|Token|Description|Regrex|Examples
+|-|-|-|-|
+|%NL|NewLine|`\r\n\|\n`||
+|%Identifier|Identifier|`[_a-zA-Z][_\w]*`| `_abc123`, `abc123`, `A_BC_1_2_3` |
+|%DecLiteral|Decimal Number|`0\|[0-9]\d+`| `0`, `123`, `64234346` |
+|%HexLiteral|Hexadecimal Number|`0x[0-9a-fA-F]+`| `0x123abc` |
+|%BinLiteral|Binary Number|`0b[10_]+`| `0b0101_1010_111` |
+|%FloatLiteral|Floating Point|`(?:0\|[0-9]\d+)?\.\d+`|
+|%SciNotationLiteral|Scientific Notation|`(?:\d*\.?\d+)[eE][-]?\d+`|
+|%Character|Character|`'(?:.\|\\["'\\a-z])*'`|
 |%String|Text|`[a-z]?"(?:\\["\\a-z]\|[^\n"\\])*"`|
 
 <br>

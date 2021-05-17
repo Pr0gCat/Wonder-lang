@@ -4,10 +4,6 @@
 import { default as lexer_moo} from "./lexer";
 const lexer = (lexer_moo as unknown) as NearleyLexer;
 
-import {ParserState} from "./parser";
-
-import {File} from "./ast";
-
 import {
 	// TODO: Add all AST nodes here
 } from "./ast/nodes";
@@ -21,10 +17,15 @@ import {
 Program -> LineEnd:* (ImportDecl LineEnd:+):* (Statement LineEnd:+):*
 {%
 	([nl, imports, stmts]) => {
-		return new ParserState(
-			imports.map(function(d:object[]){ return d[0]; }).flat(Infinity),
-			stmts.map(function(d:object[]){ return d[0]; }),
-		);
+		let comments: object[] = [...nl.flat(Infinity)];
+		imports.forEach((item: any) => {
+			comments.push(...item[1]);
+		});
+		return {
+			imports: imports.map(function(d:object[]){ return d[0]; }).flat(Infinity),
+			tree: stmts.map(function(d:object[]){ return d[0]; }),
+			comments: comments.filter((item: any) => item.type != 'NL'),
+		}
 	}
 %}
 
@@ -33,24 +34,24 @@ ImportDecl -> ("from" (ImportPath | NameRef)):? "import" ImportItemGroup
 {%
 	([_from, _import, items]) => {
 		return {
-			src: _from, 
+			src: _from,
 			items: items
 		};
 	}
 %}
 
-ImportPath -> %StringWithoutEsc
+ImportPath -> %String
 
-ImportItemGroup -> ImportItem ("," ImportItem):* 
+ImportItemGroup -> ImportItem ("," ImportItem):*
 {%
 	items => items[1].length > 0 ? [items[0], ...items[1].map(function(d:object[]){ return d[1]; })] : [items[0]]
 %}
 
 ImportItem -> %Identifier ("as" %Identifier):?
-{% 
+{%
 	items => {
 		return {
-			name: items[0], 
+			name: items[0],
 			rename_as: items[1] === null ? null : items[1][1]
 		};
 	}
@@ -84,7 +85,7 @@ Statement -> UnaryStmt
 		| BreakStmt
 		| ReturnStmt
 
-UnaryStmt -> (NameRef | IndexingExpr) "++" 
+UnaryStmt -> (NameRef | IndexingExpr) "++"
 		| (NameRef | IndexingExpr) "--"
 
 AssignStmt -> VarNameList "=" ExprList
@@ -103,11 +104,11 @@ IfStmt -> "if" Expression BlockExpr ElifStmt:?
 
 ElifStmt -> "elif" Expression BlockExpr ElifStmt:?
 
-ContinueStmt -> "continue" 
+ContinueStmt -> "continue"
 
 BreakStmt -> "break"
 
-ReturnStmt -> "return" Expression:? 
+ReturnStmt -> "return" Expression:?
 
 #
 #   Expressions
@@ -133,46 +134,46 @@ BlockExpr -> "{" (Statement LineEnd:+):* "}"
 BinOpExpr -> BinOr
 
 BinOr -> BinXor
-		| BinOr "|" BinXor 
+		| BinOr "|" BinXor
 
 BinXor -> BinAnd
-		| BinXor "^" BinAnd 
+		| BinXor "^" BinAnd
 
 BinAnd -> BinShift
-		| BinAnd "&" BinShift 
+		| BinAnd "&" BinShift
 
 BinShift -> BinAddSub
 		| BinShift "<<" BinAddSub
 		| BinShift ">>" BinAddSub
 
 BinAddSub -> BinMulDiv
-		| BinAddSub "-" BinMulDiv 
+		| BinAddSub "-" BinMulDiv
 		| BinAddSub "+" BinMulDiv
 
 BinMulDiv -> BinUnary
-		| BinMulDiv "*" BinUnary 
-		| BinMulDiv "/" BinUnary 
-		| BinMulDiv "%" BinUnary 
+		| BinMulDiv "*" BinUnary
+		| BinMulDiv "/" BinUnary
+		| BinMulDiv "%" BinUnary
 
 BinUnary -> Literal
-		| "!" Literal 
-		| "-" Literal 
+		| "!" Literal
+		| "-" Literal
 
 BoolOpExpr -> BoolOr
 
 BoolOr -> BoolXor
-		| BoolOr "or" BoolXor 
+		| BoolOr "or" BoolXor
 
 BoolXor -> BoolAnd
-		| BoolXor "xor" BoolAnd 
+		| BoolXor "xor" BoolAnd
 
 BoolAnd -> BoolNot
-		| BoolAnd "and" BoolNot 
+		| BoolAnd "and" BoolNot
 
 BoolNot -> "not":? CompareExpr
 
-CompareExpr -> Expression "==" Expression 
-		| Expression "!=" Expression 
+CompareExpr -> Expression "==" Expression
+		| Expression "!=" Expression
 		| Expression "not":? "in" Expression
 		| Expression (("<" | ">" | "<=" | ">=") Expression):+
 
@@ -195,6 +196,11 @@ ArrayExpr -> "[" Expression:? ("," Expression):* "]"
 IndexingExpr -> Expression "[" Expression "]"
 
 #
+#	Supportive Syntax
+#
+# Markdown -> %SS_Markdown   %SS_End
+
+#
 #   Misc.
 #
 ExprList -> Expression ("," Expression):*
@@ -203,16 +209,14 @@ VarNameList -> VarName ("," VarName):*
 
 VarName -> %Identifier (":" Type):?
 
-Type -> NameRef
+#  allow optional types
+Type -> _PrimitiveTypes ("|" _PrimitiveTypes):*
+
+_PrimitiveTypes -> NameRef
 	| NameRef "*"
 	| NameRef "[]"
 	| "(" (NameRef ","):+ NameRef:? ")"
 
-NameRef -> Name ("." Name)
+NameRef -> %Identifier ("." %Identifier)
 
-Name -> "@":? %Identifier
-
-LineEnd -> %SLC | %MLC | %NL
-{%
-	([item]) => item
-%}
+LineEnd -> %Comment | %NL {% id %}

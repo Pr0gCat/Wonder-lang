@@ -1,7 +1,7 @@
 /*
     namespaces.ts - Definations of namespaces.
 */
-import { ASTNode } from "./nodes/ast_node";
+import {extname, basename} from "path";
 
 export class Namespace {
 	constructor(){
@@ -12,21 +12,26 @@ export class Namespace {
 // Representing a source code file, maintain an AST.
 export class File {
 	/**
-	 * @param name File name without extension and path.
-	 * (for example "./abc/def.alice", the namespace will be "def")
-	 * @param rel_path File path related to project's root.
-	 * @param lines Total lines in the file.
-	 * @param policy Imports and Exports record.
-	 * @param ast Abstract syntax tree of the file.
+	 * @property name Identifier between namespaces
+	 */
+	name: string;
+	/**
+	 * @param path File path
+	 * @param lines Lines of code
+	 * @param imports File dependences
+	 * @param tree Abstract syntax tree of the file.
+	 * @param comments Comments collected
 	 */
 	constructor(
-		public name: string,
-		public rel_path: string,
-		public lines: number,
-		public policy: [],
-		public ast: ASTNode[],
+		public path: string,
+		public lines: string[],
+		public imports: object[],
+		public tree: object[],
+		public comments: object[]
 	) {
-
+		let extension = extname(path);
+        this.name = extension.length > 0 ? basename(path, extension) : basename(path);
+		this.name = this.name.replace('.', '_');
 	}
 }
 
