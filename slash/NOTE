@@ -1,0 +1,5 @@
+* By design, compiler should always convert absolute path into relative path.
+
+## Name convention
+
+"empty.aaa.ac" => "empty.aaa" => "empty_aaa"
