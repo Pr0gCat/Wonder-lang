@@ -2,8 +2,8 @@ import { expect } from "chai";
 import { Chance } from "chance";
 const chance = new Chance();
 
-import { RESERVED_WORDS } from "../parsing/lexer-moo";
-import lexer from "../parsing/lexer-moo";
+import { RESERVED_WORDS } from "../parsing/lexer";
+import lexer from "../parsing/lexer";
 import { Token } from "moo";
 
 // number of tries for random input

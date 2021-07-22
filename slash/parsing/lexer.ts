@@ -1,8 +1,9 @@
 /*
-    lexer_moo.ts - Tokenize text using Moo lexer.
+    lexer.ts - Tokenize text using Moo lexer.
 */
 import * as moo from "moo";
 
+// TODO: rework this
 export const RESERVED_WORDS = {
     PrimitiveType: [
         'str',
@@ -41,7 +42,7 @@ export const RESERVED_WORDS = {
     ]
 }
 
-const lexer = moo.compile({
+const LEX_RULES: moo.Rules = {
     /* Supportive Syntax */
     //TODO: Utilize Lexer State to make this happen
     // SS_Markdown: /\@md/,
@@ -86,15 +87,46 @@ const lexer = moo.compile({
     Comment: {match: /\#.*/, value: s => s.slice(1).trimStart().trimEnd()}, // we dont want any spaces before or after the comment
     WS: /[ \t]+/,
     NL: { match: /\r\n|\n/, lineBreaks: true}
-});
+};
 
-// Wrapping lexer so it will ignore whitespaces
-// See https://github.com/no-context/moo/issues/81
-lexer.next = (next => () => {
-    let tok;
-    while((tok = next.call(lexer)) && tok.type == 'WS') {}
-    // yay! now we dont have to deal with WS in parser.
-    return tok;
-})(lexer.next);
+// const lexer = moo.compile(LEX_RULE);
 
-export default lexer;
+// // Wrapping lexer so it will ignore whitespaces
+// // See https://github.com/no-context/moo/issues/81
+// lexer.next = (next => () => {
+//     let tok;
+//     while((tok = next.call(lexer)) && tok.type == 'WS') {}
+//     // yay! now we dont have to deal with WS in parser.
+//     return tok;
+// })(lexer.next);
+
+class Lexer {
+    _moo_lexer: moo.Lexer;
+    buffer: moo.Token[] = [];
+    idx: number = 0;
+
+    constructor(){
+        // create new moo lexer
+        this._moo_lexer = moo.compile(LEX_RULES);
+    }
+
+    public reset(str: string){
+        this.idx = 0;
+        this.buffer = [];
+        this._moo_lexer.reset(str);
+    }
+
+    public next(): moo.Token{
+        if(this.idx){
+
+            this.idx--;
+            return 
+        }
+    }
+
+    public retract(n: number = 1){
+
+    }
+}
+
+export default new Lexer;

@@ -26,7 +26,7 @@ export function Rule(rules: BuilderRule[], body: (...args: any[]) => ParseResult
 export function Not(rule: BuilderRule): BuilderRule{
     return (lexer) => {
         let res = rule(lexer);
-        return {success: !res.success, content: res.content};
+        return {success: !res.success, content: res.content === undefined ? [] : res.content};
     }
 }
 
@@ -37,7 +37,7 @@ export function Not(rule: BuilderRule): BuilderRule{
 export function Optional(rule: BuilderRule): BuilderRule{
     return (lexer) => {
         let res = rule(lexer);
-        return {success: true, content: res.content};
+        return {success: true, content: res.content === undefined ? [] : res.content};
     }
 }
 
@@ -69,21 +69,23 @@ export function Some(rule: BuilderRule): BuilderRule{
             if(res.success) results.push(res.content);
         } while (res.success);
 
-        return results.length ? {success: true, content: results} : {success: false};
+        return results.length > 0 ? {success: true, content: results} : {success: false, content: []};
     }
 }
 
 export function OneOf(rules: BuilderRule[]): BuilderRule{
     return (lexer) => {
-        rules.forEach(ele => {
+        for (const ele of rules) {
+            //FIX THIS: lexer need to retract, 
             let res = ele(lexer);
             if(res.success) return res;
-        });
-        return {success: false};
+        }
+        return {success: false, content: []};
     }
 }
 
 export function ExpectStr(value: string): BuilderRule{
+    if(value.length == 0) throw Error("Field 'token_type' is empty");
     return (lexer) => {
         const token = lexer.next()
         if(token == undefined) return {success: false};
@@ -93,6 +95,7 @@ export function ExpectStr(value: string): BuilderRule{
 }
 
 export function ExpectType(token_type: string): BuilderRule{
+    if(token_type.length == 0) throw Error("Field 'token_type' is empty");
     return (lexer) => {
         const token = lexer.next()
         if(token == undefined) return {success: false};
