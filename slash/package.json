@@ -13,7 +13,6 @@
   "devDependencies": {
     "@types/chai": "^4.2.21",
     "@types/chance": "^1.1.1",
-    "@types/debug": "^4.1.6",
     "@types/mocha": "^8.2.3",
     "@types/moo": "^0.5.4",
     "@types/node": "^14.14.35",
@@ -33,7 +32,6 @@
   },
   "dependencies": {
     "commander": "^7.1.0",
-    "llvm-node": "^3.0.0",
     "moo": "^0.5.1",
     "object-path": "^0.11.5",
     "simple-git": "^2.37.0"

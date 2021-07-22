@@ -1,4 +1,3 @@
-import {describe, it} from 'mocha';
 import {Rule, ExpectType, ExpectStr} from "../parsing/tree-builder";
 import lexer from "../parsing/lexer-moo";
 

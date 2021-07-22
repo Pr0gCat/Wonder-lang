@@ -2,8 +2,7 @@
   "name": "katana",
   "version": "1.0.0",
   "description": "The Katana Programming Language",
-  "scripts": {
-  },
+  "scripts": {},
   "repository": "https://github.com/Pr0gCat/Katana.git",
   "author": "ProgCat <progcat@protonmail.com>",
   "license": "MIT"
