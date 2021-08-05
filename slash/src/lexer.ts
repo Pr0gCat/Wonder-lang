@@ -5,19 +5,6 @@ import * as moo from "moo";
 
 // TODO: rework this
 export const RESERVED_WORDS = {
-    PrimitiveType: [
-        'str',
-        'bool',
-        'ptr',
-        'u8',
-        'u16',
-        'u32',
-        'u64',
-        'i8',
-        'i16',
-        'i32',
-        'i64',
-    ],
     ReservedWord: [
         'import',
         'from',

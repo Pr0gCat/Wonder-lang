@@ -1,0 +1,5 @@
+# Boolean
+
+```
+Boolean -> "true" | "false"
+```

@@ -211,6 +211,6 @@ _PrimitiveTypes -> NameRef
 	| NameRef "[]"
 	| "(" (NameRef ","):+ NameRef:? ")"
 
-NameRef -> %Identifier ("." %Identifier)
+NameRef -> %Identifier ("." %Identifier):*
 
 LineEnd -> %Comment | %NL {% id %}
