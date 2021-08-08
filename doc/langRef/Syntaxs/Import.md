@@ -1,5 +1,17 @@
 # Import
 
+```
+ImportDecl -> ImportFrom:? "import" ImportItemList
+
+ImportFrom -> "from" (ImportPath | NameRef)
+
+ImportItemList -> ImportItem ("," ImportItem):*
+
+ImportItem -> %Identifier ("as" %Identifier):?
+
+ImportPath -> %
+```
+
 ## Import from scope
 
 ```

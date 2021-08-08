@@ -1,7 +1,7 @@
 # Array
 
 ```
-ArrayDecl -> "[" ExprList:? "]"
+Array -> "[" ExprList:? "]"
 
 ArrayType -> NameRef "[" ValueRef:? "]"
 
