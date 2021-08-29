@@ -1,0 +1,3 @@
+CLI_APPNAME = 'katanac'
+CLI_VERSION = ''
+CORE_VERSION = ''
