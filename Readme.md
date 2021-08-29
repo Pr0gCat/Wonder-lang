@@ -19,3 +19,11 @@ Because it sounds cool!
 ## Build
  -->
 
+##
+
+|Path|Description|
+|-|-|
+|`kore/`|Core of Katana|
+|`doc/`|Documentations|
+|||
+|||
