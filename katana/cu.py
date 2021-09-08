@@ -1,7 +1,8 @@
+from multiprocessing import Process, Queue
 
+class CompileUnit(Process):
+    def __init__(self):
+        super().__init__(daemon=True)
 
-class CompileUnit:
-    def __init__(self) -> None:
+    def run(self):
         pass
-
-    def 

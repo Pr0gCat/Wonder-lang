@@ -1,1 +1,4 @@
 .DS_Store
+katana.egg-info/
+__pycache__/
+Pipfile.lock
