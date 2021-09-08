@@ -1,0 +1,13 @@
+%import shared (
+    SPACES, 
+    IDENT, 
+    _NL,
+    COMMENT
+)
+
+%ignore SPACES
+%ignore COMMENT
+
+_file: _NL* importation* (stmt _NL+)* 
+
+

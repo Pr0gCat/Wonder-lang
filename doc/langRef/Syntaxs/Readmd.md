@@ -1,6 +1,6 @@
 # Syntaxs
 
-All syntax will be described in nearley's EBNF.
+All syntax will be described in Lark's EBNF.
 
 ## Program
 

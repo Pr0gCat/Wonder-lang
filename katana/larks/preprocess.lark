@@ -1,0 +1,31 @@
+%import shared (SPACES, COMMENT, SIMPLE_STRING, IDENT)
+
+// we kept all the newlines
+NL: (/\r?\n/)+
+
+// Things to be ignored //
+%ignore COMMENT
+
+SS_MD: "@md"
+SS_IF: "@if"
+SS_ELIF: "@elif"
+SS_ELSE: "@else"
+SS_END: "@end" 
+SS_VAR: "@" IDENT
+
+CODE: /[^@\n]+/
+
+_section_header: SS_MD
+    | SS_IF
+    | SS_ELIF 
+    | SS_ELSE
+
+_start: NL* (_ss_stmt NL*)+
+
+_ss_stmt: _section_header NL+ (_ss_stmt NL*)+ SS_END
+    | content
+
+?content: CODE | bultin_var
+
+?bultin_var: SS_VAR
+    | SS_VAR "(" SIMPLE_STRING ")" -> ss_func

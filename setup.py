@@ -7,7 +7,7 @@ setup(
     packages=['katana'],
     entry_points={
         'console_scripts': [
-            f"{CLI_APPNAME} = katana.cli.__main__:main"
+            f"{CLI_APPNAME} = katana.cli:main"
         ]
     }
 )
