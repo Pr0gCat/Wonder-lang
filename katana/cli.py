@@ -1,6 +1,7 @@
 import argparse
 from os import getcwd, path
 from katana import KROOT, CLI_APPNAME
+from katana.core import build_package
 
 def get_args():
     ap = argparse.ArgumentParser(CLI_APPNAME)
@@ -23,15 +24,6 @@ def _add_build_command(ap: argparse.ArgumentParser):
 def _add_env_command(ap: argparse.ArgumentParser):
     ap.description='Display environment settings'
 
-def execute_build(entry_file):
-    # preprocess entry file
-    # parse entry file's importations
-    # fulfil dependences
-    # configure compiler
-    # start compile
-    # state: finished
-    pass
-
 def main():
     ap, args = get_args()
     print(args)
@@ -53,7 +45,8 @@ def main():
                 ap.exit(-1, f'error: Could not find any entry file from "{args.entry_file}".')
         if not path.exists(args.entry_file):
             ap.exit(-1, f'error: File "{args.entry_file}" does not exists.')
-        execute_build(args.entry_file)
+        build_package(args.entry_file)
+        
     elif args.cmd == 'env':
         pass # dump environment variable as json
     else:
