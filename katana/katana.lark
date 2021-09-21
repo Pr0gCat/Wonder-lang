@@ -1,0 +1,189 @@
+SPACES: (" " | /\t/)+
+_NL: (/\r?\n/)+
+COMMENT: /#.*\n/
+MULTILINE_STRING: /"""(?:\\["]|[^"])*"""/
+
+IDENT: /[_a-zA-Z][\w]*/
+CONST_IDENT: /[_A-Z][0-9_A-Z]*/
+SS_VAR: /@[_a-zA-Z][\w]*/ 
+
+// Literals regrex
+SIMPLE_STRING: /"(?:\\["\\tnr0]|[^\n"\\])*"/
+STRING: /[a-z]?"(?:\\["\\tnr0]|[^\n"\\])*"/
+CHARACTER: /'(?:.?|\\["'\\a-z])'/
+HEX_NUM: /0x[0-9a-fA-F_]*/
+BIN_NUM: /0b[10_]+/
+SCI_NOTATION_NUM: /(?:\d*\.?\d+)[eE][-]?\d+/
+FLOATING_NUM: /\d*\.\d+/
+DEC_NUM: /0|[1-9]\d+/
+
+%ignore SPACES
+
+//
+//  Entry Point
+//
+file: _NL* outer_code*
+
+?outer_code: (outer_decl | importation) _NL+
+    | COMMENT
+    | MULTILINE_STRING
+
+?inner_code: (inner_decl | inner_stmt) _NL+
+    | COMMENT
+    | MULTILINE_STRING
+
+//
+//  Importation
+//
+KW_FROM: "from"
+KW_IMPORT: "import"
+_KW_AS: "as"
+
+importation: import_from? KW_IMPORT import_items
+
+import_from: KW_FROM name_ref -> from_namespace
+    | KW_FROM /[\.\w\/\-_\\(\)\s]+(?=import)/ -> from_path
+    | KW_FROM /\"(http(s)?|ssh|git):\/\/[\w\.\/]+\"/ -> from_git
+
+import_items: import_item ("," import_item)*
+
+import_item: IDENT (_KW_AS IDENT)?
+
+//
+// Declarations
+//
+KW_LET: "let"
+KW_CONST: "const"
+KW_FUNC: "func"
+KW_ENUM: "enum"
+KW_STRUCT: "struct"
+
+?outer_decl: inner_decl
+    | KW_FUNC name_ref "(" ")" (":" type)? inner_block -> func_decl
+    | KW_ENUM IDENT "{" enum_member ("," enum_member)* ","? "}" -> enum_decl
+    //| KW_STRUCT IDENT "{" "}"
+
+enum_member: IDENT ("=" expr)?
+
+?inner_decl: KW_LET ident_list "=" expr_list -> var_decl
+    | KW_CONST CONST_IDENT "=" expr -> const_decl
+
+//
+//  Statements
+//
+KW_IF: "if"
+KW_ELIF: "elif"
+KW_ELSE: "else"
+KW_RETURN: "return"
+KW_BREAK: "break"
+KW_CONTINUE: "continue"
+
+?stmt: ss_stmts
+    | func_call
+    | if_stmt
+    | KW_RETURN expr? -> return_stmt
+    | KW_CONTINUE -> continue_stmt
+    | KW_BREAK -> break_stmt
+
+if_stmt: KW_IF expr block elif_stmt* else_stmt?
+
+elif_stmt: KW_ELIF expr block
+
+else_stmt: KW_ELSE block
+
+//
+//  Expressions
+//
+?expr: "(" expr ")"
+    | t5_binop
+    | t3_boolop
+    | compare_expr
+    | inner_block
+    | func_call
+
+L_BRACKET: "{"
+R_BRACKET: "}"
+
+block: L_BRACKET _NL+ outer_code* _NL* R_BRACKET -> outer_block
+    | inner_block
+    
+inner_block: L_BRACKET _NL+ inner_code* _NL* R_BRACKET
+
+!func_call: func_call ("." func_call)+ -> waterfall_func_call
+    | name_ref "(" expr_list* ")"
+
+BINOP_NOT: "!"
+BINOP_SUB: "-"
+
+?t5_binop: t4_binop
+        | t5_binop "|" t4_binop -> or_binop
+
+?t4_binop: t3_binop
+        | t4_binop "^" t3_binop -> xor_binop
+
+?t3_binop: t2_binop
+		 | t3_binop "&" t2_binop -> and_binop
+
+?t2_binop: t1_binop 
+		| t2_binop "<<" t1_binop -> shl_binop
+        | t2_binop ">>" t1_binop -> shr_binop
+
+?t1_binop: t0_binop
+          | t1_binop "+" t0_binop -> add_binop
+          | t1_binop "-" t0_binop -> sub_binop
+
+?t0_binop: unary_binop
+          | t0_binop "*" unary_binop -> mul_binop
+          | t0_binop "/" unary_binop -> div_binop
+          | t0_binop "%" unary_binop -> mod_binop
+
+?unary_binop: (BINOP_NOT | BINOP_SUB)? value
+
+?t3_boolop: t2_boolop
+    | t3_boolop "or" t2_boolop -> or_boolop
+
+?t2_boolop: t1_boolop
+    | t2_boolop "xor" t1_boolop -> xor_boolop
+
+?t1_boolop: not_boolop
+    | t1_boolop "and" not_boolop -> and_boolop
+
+KW_NOT: "not"
+
+?not_boolop: KW_NOT? expr
+
+?compare_expr: expr "==" expr -> equal
+			| expr "!=" expr -> not_equal
+			| expr "<" expr -> less_than
+			| expr "<=" expr -> less_or_equal
+			| expr ">" expr -> more_than
+			| expr ">=" expr -> more_or_equal
+
+?value: literal
+    | name_ref
+    | "[" expr_list+ "]" -> list_decl
+    | "(" expr_list+ ")" -> tuple_decl
+
+?literal: STRING
+    | MULTILINE_STRING
+    | CHARACTER
+    | HEX_NUM
+    | BIN_NUM
+    | SCI_NOTATION_NUM
+    | FLOATING_NUM
+    | DEC_NUM
+
+//  Terms
+name_ref: IDENT ("." IDENT)*
+    | SS_VAR
+
+list_template{x}: x ("," x)*
+
+ident_list: list_template{IDENT}
+expr_list: list_template{expr}
+
+parameter_decl: type IDENT
+
+param_list: list_template{parameter_decl}
+
+!type: name_ref ("*"+ | "&")?

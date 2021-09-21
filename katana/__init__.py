@@ -1,4 +1,4 @@
-CLI_APPNAME = 'katanac'
+CLI_APPNAME = 'kata'
 CLI_VERSION = '0.1'
 CORE_VERSION = '0.1'
 

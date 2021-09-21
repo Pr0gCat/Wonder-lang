@@ -1,5 +1,0 @@
-# Scope
-
-```
-BlockExpr -> "{" (Statement LineEnd:+):* "}"
-```

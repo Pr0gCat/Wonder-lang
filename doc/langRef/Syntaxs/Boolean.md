@@ -1,5 +1,0 @@
-# Boolean
-
-```
-Boolean -> "true" | "false"
-```

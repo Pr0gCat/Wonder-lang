@@ -6,6 +6,7 @@ This programming language aims to be
 * Portable (OSDev friendly)
 * Independent (Try not rely on libc)
 * Painless
+* Could run as an interpreted language
 
 **This programming language is still work in progress, PR is always welcome!**
 
